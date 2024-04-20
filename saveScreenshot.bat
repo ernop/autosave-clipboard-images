@@ -1,0 +1,1 @@
+powershell.exe -ExecutionPolicy Bypass -File "d:\proj\autosave-clipboard\autosave-clipboard-images.ps1"
