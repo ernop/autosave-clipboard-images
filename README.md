@@ -1,0 +1,1 @@
+# autosave-clipboard-images
