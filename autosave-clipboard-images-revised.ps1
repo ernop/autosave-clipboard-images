@@ -10,6 +10,10 @@ if (-not (Test-Path -Path $folderPath)) {
     New-Item -ItemType Directory -Force -Path $folderPath
 }
 
+# Initialize global arrays to store seen hashes
+$global:seenImageHashes = @()
+$global:seenTextHashes = @()
+
 # Initialize variables to track last saved content
 $lastImageHash = $null
 $lastTextHash = $null
@@ -37,21 +41,21 @@ function SaveTextToFile($text) {
     Write-Host "Saved text: $fileName"
 }
 
-# Function to save clipboard content
+# Function to save clipboard content with hash checks
 function SaveClipboardContent {
     if ([System.Windows.Forms.Clipboard]::ContainsText()) {
         $text = [System.Windows.Forms.Clipboard]::GetText()
         $currentTextHash = $text.GetHashCode().ToString()
-        if ($currentTextHash -ne $global:lastTextHash) {
+        if ($currentTextHash -notin $global:seenTextHashes) {
             SaveTextToFile $text
+            $global:seenTextHashes += $currentTextHash
             $global:lastText = $text
-            $global:lastTextHash = $currentTextHash
             $global:lastImageHash = $null
         }
     } elseif ([System.Windows.Forms.Clipboard]::ContainsImage()) {
         $image = [System.Windows.Forms.Clipboard]::GetImage()
         $currentImageHash = Get-ImageHash $image
-        if ($currentImageHash -ne $global:lastImageHash) {
+        if ($currentImageHash -notin $global:seenImageHashes) {
             # Generate unique filename based on timestamp
             $fileName = [System.IO.Path]::Combine($folderPath, "Screenshot_" + (Get-Date -Format "yyyyMMddHHmmss") + ".png")
             $bitmap = New-Object System.Drawing.Bitmap $image
@@ -59,7 +63,7 @@ function SaveClipboardContent {
             $bitmap.Dispose()
             Write-Host "Saved image: $fileName"
             [System.Windows.Forms.Clipboard]::SetText($global:lastText)
-            $global:lastImageHash = $currentImageHash
+            $global:seenImageHashes += $currentImageHash
         }
     }
 }
