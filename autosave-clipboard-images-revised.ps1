@@ -31,11 +31,10 @@ function Get-ImageHash($image) {
     return [BitConverter]::ToString($hash) -replace '-', ''
 }
 
-# Function to save text to a file
 function SaveTextToFile($text) {
     # Generate unique filename based on text prefix and timestamp
     $fileName = [System.IO.Path]::Combine($folderPath, 
-        ($text.Substring(0, [Math]::Min(20, $text.Length)) -replace "[^\w\d]", "") + "_" + 
+        ($text.Substring(0, [Math]::Min(20, $text.Length)) -replace "[^\w\d_-]", "-") + "_" + 
         (Get-Date -Format "yyyyMMddHHmmss") + ".txt")
     $text | Out-File -FilePath $fileName
     Write-Host "Saved text: $fileName"
