@@ -211,4 +211,7 @@ try {
 } catch [System.Management.Automation.Host.HostException] {
     Write-Host "Script terminated by user."
     [HotKeyRegister]::UnregisterHotKey($form.Handle, $hotkeyId1)
-    [HotKeyRegister
+    [HotKeyRegister]::UnregisterHotKey($form.Handle, $hotkeyId2)
+    $form.Dispose()
+    exit
+}
