@@ -50,14 +50,16 @@ namespace ClipboardMonitor
                 int lineCount = text.Split('\n').Length;
                 var plural = (lineCount > 1 || lineCount == 0) ? "s" : "";
                 _form.LengthLabel.Text = $"{lineCount} line{plural} ({text.Length} chars)";
+                _form.ResolutionLabel.Text = "";
             }
             else if (item.Type == ClipboardItemType.Image)
             {
-                var imgResolution = resolution ?? $"{((System.Drawing.Image)item.Content).Width}x{((Image)item.Content).Height}";
+                var thing = (Image)item.Content;
+                var imgResolution = resolution ?? $"{thing.Width}x{thing.Height}";
                 var imgAddedTime = addedTime ?? item.AddedTime;
                 var imgFilename = originalFilename ?? item.OriginalFilename;
                 _form.LengthLabel.Text = "";
-                _form.ResolutionLabel.Text = $"Resolution: {imgResolution}";
+                _form.ResolutionLabel.Text = $"Resolution: {imgResolution}, DPI {thing.HorizontalResolution}x{thing.VerticalResolution} {thing.PixelFormat}";
             }
             _form.ItemIndexLabel.Text = $"Item {_form.ClipboardIndex+ 1}/{_form.ClipboardHistory.Count}";
             _form.AddedTimeLabel.Text = $"Added: {addedTime:dddd, HH:mm:ss}";

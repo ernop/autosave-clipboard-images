@@ -16,6 +16,8 @@ namespace ClipboardMonitor
         private string _folderPath = "C:\\Screenshots";
         public event EventHandler<ClipboardChangedEventArgs> ClipboardChanged;
 
+        private string _lastSavedImageFileName;
+
         public int ClipboardIndex
         {
             get => _clipboardIndex;
@@ -95,7 +97,6 @@ namespace ClipboardMonitor
             Console.WriteLine($"Saved text: {fileName}");
         }
 
-        private string _lastSavedImageFileName;
 
         private void SaveImageToFile(Image image)
         {

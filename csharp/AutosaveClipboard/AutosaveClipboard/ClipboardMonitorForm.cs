@@ -10,6 +10,7 @@ namespace ClipboardMonitor
 {
     public class ClipboardMonitorForm : Form
     {
+        // Constants
         private const int HOTKEY_ID_PREVIOUS = 1;
         private const int HOTKEY_ID_NEXT = 2;
         private const int MOD_CONTROL = 0x2;
@@ -17,9 +18,11 @@ namespace ClipboardMonitor
         private const int MOD_ALT = 0x1;
         private const int WM_HOTKEY = 0x312;
         private const int StatusBarHeight = 25;
+        private const int ThumbnailsBarHeight = 200;
         private const double ElapsedTimeUpdateInterval = 1000;
 
-        private PictureBox _thumbnailPictureBox;
+        // Controls
+        private PictureBox _mainThumbnailPictureBox;
         private Label _copiedTextBox;
         private Label _itemIndexLabel;
         private Label _resolutionLabel;
@@ -28,23 +31,33 @@ namespace ClipboardMonitor
         private Label _elapsedTimeLabel;
         private Button _previousButton;
         private Button _nextButton;
+        private Panel _thumbnailsPanel;
+        private PictureBox _arrowIndicator;
+        private ThumbnailsBarUpdater _thumbnailsBarUpdater;
 
+
+        // Timer
         private DateTime _lastAddedTime;
         private System.Timers.Timer _elapsedTimeUpdateTimer;
+
+        // Managers
         private ClipboardManager _clipboardManager;
         public StatusBarManager _statusBarManager;
         private NavigationManager _navigationManager;
 
+        // Properties
         public Label ItemIndexLabel => _itemIndexLabel;
         public Label ResolutionLabel => _resolutionLabel;
         public Label AddedTimeLabel => _addedTimeLabel;
         public Label LengthLabel => _lengthLabel;
         public Label ElapsedTimeLabel => _elapsedTimeLabel;
         public List<ClipboardItem> ClipboardHistory => _clipboardManager.ClipboardHistory;
-        public PictureBox ThumbnailPictureBox => _thumbnailPictureBox;
+        public PictureBox ThumbnailPictureBox => _mainThumbnailPictureBox;
         public int ClipboardIndex => _clipboardManager.ClipboardIndex;
         public Label TextLabel => _copiedTextBox;
+        public ThumbnailsBarUpdater ThumbnailBarUpdater => _thumbnailsBarUpdater;
 
+        // Constructor
         public ClipboardMonitorForm()
         {
             Text = "CLP";
@@ -59,15 +72,23 @@ namespace ClipboardMonitor
 
             InitializeComponents();
 
+            _thumbnailsPanel = new Panel { Dock = DockStyle.Bottom };
+            Controls.Add(_thumbnailsPanel);
+
+            _thumbnailsBarUpdater = new ThumbnailsBarUpdater(_thumbnailsPanel, _clipboardManager, _navigationManager);
+
             _clipboardManager.ClipboardChanged += OnClipboardChanged;
             _navigationManager.ClipboardChanged += OnClipboardChanged;
             _statusBarManager.StartTimer();
+
             Resize += ClipboardMonitorForm_Resize;
             ClipboardMonitorForm_Resize(this, EventArgs.Empty);
 
             _elapsedTimeUpdateTimer = new System.Timers.Timer(ElapsedTimeUpdateInterval);
             _elapsedTimeUpdateTimer.Elapsed += (s, e) => UpdateElapsedTime();
             _elapsedTimeUpdateTimer.Start();
+
+            _thumbnailsBarUpdater.UpdateThumbnailsBar();
         }
 
         private Label NewLabel()
@@ -85,11 +106,12 @@ namespace ClipboardMonitor
 
         private void InitializeComponents()
         {
-            _thumbnailPictureBox = new PictureBox
+            // Initialize main display area components
+            _mainThumbnailPictureBox = new PictureBox
             {
                 SizeMode = PictureBoxSizeMode.Zoom,
                 Location = new Point(0, 0),
-                Size = new Size(Width, Height - StatusBarHeight),
+                Size = new Size(Width, Height - StatusBarHeight - ThumbnailsBarHeight),
                 Visible = false,
                 BackColor = Color.LightGray,
                 BorderStyle = BorderStyle.Fixed3D
@@ -98,7 +120,7 @@ namespace ClipboardMonitor
             _copiedTextBox = new Label
             {
                 Location = new Point(0, 0),
-                Size = new Size(Width, Height - StatusBarHeight),
+                Size = new Size(Width, Height - StatusBarHeight - ThumbnailsBarHeight),
                 AutoSize = false,
                 TextAlign = ContentAlignment.TopLeft,
                 Font = new Font("Arial", 18),
@@ -107,9 +129,10 @@ namespace ClipboardMonitor
                 BorderStyle = BorderStyle.Fixed3D
             };
 
-            Controls.Add(_thumbnailPictureBox);
+            Controls.Add(_mainThumbnailPictureBox);
             Controls.Add(_copiedTextBox);
 
+            // Initialize status bar labels
             _itemIndexLabel = NewLabel();
             _resolutionLabel = NewLabel();
             _addedTimeLabel = NewLabel();
@@ -122,6 +145,7 @@ namespace ClipboardMonitor
             Controls.Add(_lengthLabel);
             Controls.Add(_elapsedTimeLabel);
 
+            // Initialize navigation buttons
             _previousButton = new Button
             {
                 Text = "← Back",
@@ -146,7 +170,7 @@ namespace ClipboardMonitor
         {
             int totalUnits = 6; // 5 labels + 1 unit for both buttons
             int labelWidth = Width / totalUnits;
-            int statusBarTop = ClientSize.Height - StatusBarHeight;
+            int statusBarTop = ClientSize.Height - StatusBarHeight - ThumbnailsBarHeight;
             var ii = 0;
 
             foreach (var label in new[] { _itemIndexLabel, _resolutionLabel, _addedTimeLabel, _lengthLabel, _elapsedTimeLabel })
@@ -168,8 +192,39 @@ namespace ClipboardMonitor
             _nextButton.Left = _previousButton.Left + _previousButton.Width;
 
             var factor = 2.5;
-            _thumbnailPictureBox.Size = new Size(ClientSize.Width, Height - (int)(factor * StatusBarHeight));
-            _copiedTextBox.Size = new Size(ClientSize.Width, Height - (int)(factor * StatusBarHeight));
+            _mainThumbnailPictureBox.Size = new Size(ClientSize.Width, Height - (int)(factor * StatusBarHeight) - ThumbnailsBarHeight);
+            _copiedTextBox.Size = new Size(ClientSize.Width, Height - (int)(factor * StatusBarHeight) - ThumbnailsBarHeight);
+
+            // Resize thumbnails panel
+            _thumbnailsPanel.Size = new Size(ClientSize.Width, ThumbnailsBarHeight);
+            _thumbnailsPanel.Top = ClientSize.Height - ThumbnailsBarHeight;
+        }
+
+        private void OnClipboardChanged(object sender, ClipboardChangedEventArgs e)
+        {
+            if (e.ClipboardItem.Type == ClipboardItemType.Text)
+            {
+                var text = e.ClipboardItem.Content.ToString();
+                int lineCount = text.Split('\n').Length;
+                string preview = text.Length > 30 ? text.Substring(0, 30) + "..." : text;
+                ShowNotification($"TEXT:\t\t{preview}\r\n\t{lineCount} LINES");
+                _copiedTextBox.Text = text;
+                _copiedTextBox.Visible = true;
+                _mainThumbnailPictureBox.Visible = false;
+                var plural = (lineCount > 1 || lineCount == 0) ? "s" : "";
+                Text = $"CLP - {preview} ({lineCount} line{plural}, {text.Length} chars)";
+            }
+            else if (e.ClipboardItem.Type == ClipboardItemType.Image)
+            {
+                var image = (Image)e.ClipboardItem.Content;
+                ShowNotification($"IMAGE:\t\t{image.Width}x{image.Height}, {image.PixelFormat}");
+                _mainThumbnailPictureBox.Image = image;
+                _mainThumbnailPictureBox.Visible = true;
+                _copiedTextBox.Visible = false;
+                Text = $"CLP - Image - {e.Resolution}";
+            }
+            _statusBarManager.UpdateStatusBar(e.ClipboardIndex, e.Resolution, e.AddedTime);
+            _thumbnailsBarUpdater.UpdateThumbnailsBar();
         }
 
         private void ShowNotification(string message)
@@ -230,41 +285,13 @@ namespace ClipboardMonitor
             base.WndProc(ref m);
         }
 
-        private void OnClipboardChanged(object sender, ClipboardChangedEventArgs e)
-        {
-            if (e.ClipboardItem.Type == ClipboardItemType.Text)
-            {
-                var text = e.ClipboardItem.Content.ToString();
-                int lineCount = text.Split('\n').Length;
-                string preview = text.Length > 30 ? text.Substring(0, 30) + "..." : text;
-                ShowNotification($"TEXT:\t\t{preview}\r\n\t{lineCount} LINES");
-                _copiedTextBox.Text = text;
-                _copiedTextBox.Visible = true;
-                _thumbnailPictureBox.Visible = false;
-                var plural = (lineCount > 1 || lineCount == 0) ? "s" : "";
-                Text = $"CLP - {preview} ({lineCount} line{plural}, {text.Length} chars)";
-            }
-            else if (e.ClipboardItem.Type == ClipboardItemType.Image)
-            {
-                var image = (Image)e.ClipboardItem.Content;
-                ShowNotification($"IMAGE:\t\t{image.Width}x{image.Height}, {image.PixelFormat}");
-                _thumbnailPictureBox.Image = image;
-                _thumbnailPictureBox.Visible = true;
-                _copiedTextBox.Visible = false;
-                Text = $"CLP - Image - {e.Resolution}";
-            }
-            _statusBarManager.UpdateStatusBar(e.ClipboardIndex, e.Resolution, e.AddedTime);
-        }
-
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool RegisterHotKey(IntPtr hWnd, int id, int fsModifiers, int vk);
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
-
         private void InitializeComponent()
         {
-            // Removed unused method.
         }
     }
 }

@@ -39,6 +39,16 @@ namespace ClipboardMonitor
             }
         }
 
+        public void JumpToClipboardItem(int index)
+        {
+            if (index >= 0 && index < _clipboardManager.ClipboardHistory.Count)
+            {
+                _clipboardManager.ClipboardIndex = index;
+                LoadClipboardContent(index);
+                Console.WriteLine($"Jumped to clipboard item at index {index}");
+            }
+        }
+
         private void LoadClipboardContent(int index)
         {
             var item = _clipboardManager.ClipboardHistory[index];
